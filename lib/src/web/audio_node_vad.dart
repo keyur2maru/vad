@@ -10,6 +10,7 @@ import 'frame_processor.dart';
 import 'resampler.dart';
 import 'onnx_runtime_web.dart';
 import 'speech_probabilities.dart';
+import 'model_utils.dart';
 
 class AudioNodeVadOptions {
   final FrameProcessorOptions frameProcessorOptions;
@@ -57,8 +58,7 @@ class AudioNodeVAD {
 
   Future<void> _initialize() async {
     // Load the appropriate model
-    final modelFile = _options.model == 'v5' ? 'silero_vad_v5.onnx' : 'silero_vad_legacy.onnx';
-    final modelUrl = '${_options.baseAssetPath}$modelFile';
+    final modelUrl = getModelUrl(_options.baseAssetPath, _options.model);
     
     late VadModel model;
     if (_options.model == 'v5') {
@@ -96,7 +96,8 @@ class AudioNodeVAD {
 
     // Set up audio processing handler
     bool processingAudio = false;
-    (_audioNode! as web.ScriptProcessorNode).onaudioprocess = (web.AudioProcessingEvent e) async {
+    (_audioNode! as web.ScriptProcessorNode).onaudioprocess = 
+        ((web.AudioProcessingEvent e) async {
       if (processingAudio) return;
       processingAudio = true;
 
@@ -125,7 +126,7 @@ class AudioNodeVAD {
       } finally {
         processingAudio = false;
       }
-    }.toJS;
+    }).toJS;
 
     // Connect audio chain
     _audioNode!.connectNode(_gainNode!);
@@ -199,25 +200,33 @@ class MicVAD {
   );
 
   static Future<MicVAD> create(AudioNodeVadOptions options) async {
-    // Get microphone stream
-    final stream = await web.window.navigator.mediaDevices.getUserMedia({
-      'audio': {
-        'channelCount': 1,
-        'echoCancellation': true,
-        'autoGainControl': true,
-        'noiseSuppression': true,
-      }.jsify()!,
-    }.jsify()!).toDart;
+    try {
+      // Get microphone stream
+      final constraints = {
+        'audio': {
+          'channelCount': 1,
+          'echoCancellation': true,
+          'autoGainControl': true,
+          'noiseSuppression': true,
+        }.jsify()!,
+      }.jsify()!;
+      
+      final stream = await web.window.navigator.mediaDevices
+          .getUserMedia(constraints).toDart;
 
-    final audioContext = web.AudioContext();
-    final sourceNode = web.MediaStreamAudioSourceNode(audioContext, {
-      'mediaStream': stream,
-    }.jsify()!);
+      final audioContext = web.AudioContext();
+      final sourceNode = web.MediaStreamAudioSourceNode(audioContext, {
+        'mediaStream': stream,
+      }.jsify()!);
 
-    final audioNodeVAD = await AudioNodeVAD.create(audioContext, options);
-    audioNodeVAD.connect(sourceNode);
+      final audioNodeVAD = await AudioNodeVAD.create(audioContext, options);
+      audioNodeVAD.connect(sourceNode);
 
-    return MicVAD._(options, audioContext, stream, audioNodeVAD, sourceNode);
+      return MicVAD._(options, audioContext, stream, audioNodeVAD, sourceNode);
+    } catch (e) {
+      print('Error creating MicVAD: $e');
+      rethrow;
+    }
   }
 
   void pause() {

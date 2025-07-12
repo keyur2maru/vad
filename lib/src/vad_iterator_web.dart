@@ -1,38 +1,40 @@
 import 'package:vad/src/vad_iterator_base.dart';
 
+import 'package:vad/src/vad_iterator_base.dart';
+
 /// VadIteratorWeb class
-/// DO NOT USE
-/// Not implemented for web, since Web uses JavaScript library for VAD
-/// Only added for compatibility with non-web platforms
+/// Updated to work with pure Dart implementation but currently not fully implemented
+/// Web platform primarily uses the VadHandler approach through VadHandlerWeb
+/// This is mainly for compatibility with non-web platforms
 class VadIteratorWeb implements VadIteratorBase {
   @override
   void forceEndSpeech() {
-    throw UnimplementedError();
+    throw UnimplementedError('VadIteratorWeb: Use VadHandlerWeb instead for web platform');
   }
 
   @override
   Future<void> initModel(String modelPath) {
-    throw UnimplementedError();
+    throw UnimplementedError('VadIteratorWeb: Use VadHandlerWeb instead for web platform');
   }
 
   @override
   Future<void> processAudioData(List<int> data) {
-    throw UnimplementedError();
+    throw UnimplementedError('VadIteratorWeb: Use VadHandlerWeb instead for web platform');
   }
 
   @override
   void release() {
-    throw UnimplementedError();
+    throw UnimplementedError('VadIteratorWeb: Use VadHandlerWeb instead for web platform');
   }
 
   @override
   void reset() {
-    throw UnimplementedError();
+    throw UnimplementedError('VadIteratorWeb: Use VadHandlerWeb instead for web platform');
   }
 
   @override
   void setVadEventCallback(VadEventCallback callback) {
-    throw UnimplementedError();
+    throw UnimplementedError('VadIteratorWeb: Use VadHandlerWeb instead for web platform');
   }
 }
 
