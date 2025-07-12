@@ -20,6 +20,7 @@ dependencies:
     sdk: flutter
   onnxruntime: ^1.4.1
   record: ^6.0.0
+  web: ^1.1.0
 
 
 dev_dependencies:
@@ -31,10 +32,6 @@ flutter:
   assets:
     - packages/vad/assets/silero_vad_legacy.onnx
     - packages/vad/assets/silero_vad_v5.onnx
-    - packages/vad/assets/bundle.min.js
-    - packages/vad/assets/vad.worklet.bundle.min.js
-    - packages/vad/assets/vad_web.js
-    - packages/vad/assets/ort.js
     - packages/vad/assets/ort-wasm-simd.wasm
     - packages/vad/assets/ort-wasm-simd-threaded.wasm
 

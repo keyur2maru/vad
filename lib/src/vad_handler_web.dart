@@ -1,46 +1,14 @@
 // vad_handler_web.dart
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
+
 import 'vad_handler_base.dart';
-
-/// Start listening for voice activity detection (JS-binding)
-@JS('startListeningImpl')
-external void startListeningImpl(
-    double positiveSpeechThreshold,
-    double negativeSpeechThreshold,
-    int preSpeechPadFrames,
-    int redemptionFrames,
-    int frameSamples,
-    int minSpeechFrames,
-    bool submitUserSpeechOnPause,
-    String model,
-    String baseAssetPath,
-    String onnxWASMBasePath);
-
-/// Stop listening for voice activity detection (JS-binding)
-@JS('stopListeningImpl')
-external void stopListeningImpl();
-
-/// Pause listening for voice activity detection (JS-binding)
-@JS('pauseListeningImpl')
-external void pauseListeningImpl();
-
-/// Check if the VAD is currently listening (JS-binding)
-@JS('isListeningNow')
-external bool isListeningNow();
-
-/// Log a message to the console (JS-binding)
-@JS('logMessage')
-external void logMessage(String message);
-
-/// Execute a Dart handler (JS-binding)
-@JS('callDartFunction')
-external void executeDartHandler();
+import 'web/audio_node_vad.dart';
+import 'web/frame_processor.dart';
+import 'web/speech_probabilities.dart';
 
 /// VadHandlerWeb class
 class VadHandlerWeb implements VadHandlerBase {
@@ -65,11 +33,13 @@ class VadHandlerWeb implements VadHandlerBase {
 
   /// Whether to print debug messages
   bool isDebug = false;
+  
+  /// Current MicVAD instance
+  MicVAD? _micVAD;
 
   /// Constructor
   VadHandlerWeb({required bool isDebug}) {
-    globalContext['executeDartHandler'] = handleEvent.toJS;
-    isDebug = isDebug;
+    this.isDebug = isDebug;
   }
 
   @override
@@ -104,111 +74,103 @@ class VadHandlerWeb implements VadHandlerBase {
       String baseAssetPath = 'assets/packages/vad/assets/',
       String onnxWASMBasePath = 'assets/packages/vad/assets/',
       RecordConfig? recordConfig}) async {
+    
     if (isDebug) {
       debugPrint(
-          'VadHandlerWeb: startListening: Calling startListeningImpl with parameters: '
+          'VadHandlerWeb: startListening: Creating VAD with parameters: '
           'positiveSpeechThreshold: $positiveSpeechThreshold, '
           'negativeSpeechThreshold: $negativeSpeechThreshold, '
           'preSpeechPadFrames: $preSpeechPadFrames, '
           'redemptionFrames: $redemptionFrames, '
           'frameSamples: $frameSamples, '
           'minSpeechFrames: $minSpeechFrames, '
-          'submitUserSpeechOnPause: $submitUserSpeechOnPause'
-          'model: $model'
-          'baseAssetPath: $baseAssetPath'
+          'submitUserSpeechOnPause: $submitUserSpeechOnPause, '
+          'model: $model, '
+          'baseAssetPath: $baseAssetPath, '
           'onnxWASMBasePath: $onnxWASMBasePath');
     }
-    startListeningImpl(
-        positiveSpeechThreshold,
-        negativeSpeechThreshold,
-        preSpeechPadFrames,
-        redemptionFrames,
-        frameSamples,
-        minSpeechFrames,
-        submitUserSpeechOnPause,
-        model,
-        baseAssetPath,
-        onnxWASMBasePath);
+
+    try {
+      // Create frame processor options
+      final frameProcessorOptions = FrameProcessorOptions(
+        positiveSpeechThreshold: positiveSpeechThreshold,
+        negativeSpeechThreshold: negativeSpeechThreshold,
+        preSpeechPadFrames: preSpeechPadFrames,
+        redemptionFrames: redemptionFrames,
+        frameSamples: frameSamples,
+        minSpeechFrames: minSpeechFrames,
+        submitUserSpeechOnPause: submitUserSpeechOnPause,
+      );
+
+      // Create AudioNodeVadOptions
+      final options = AudioNodeVadOptions(
+        frameProcessorOptions: frameProcessorOptions,
+        onFrameProcessed: _onFrameProcessed,
+        onVADMisfire: _onVADMisfire,
+        onSpeechStart: _onSpeechStart,
+        onSpeechEnd: _onSpeechEnd,
+        onSpeechRealStart: _onSpeechRealStart,
+        model: model,
+        baseAssetPath: baseAssetPath,
+        onnxWASMBasePath: onnxWASMBasePath,
+      );
+
+      // Create and start MicVAD
+      _micVAD = await MicVAD.create(options);
+      _micVAD!.start();
+      
+      if (isDebug) {
+        debugPrint('VadHandlerWeb: VAD started successfully');
+      }
+    } catch (error, stackTrace) {
+      if (isDebug) {
+        debugPrint('VadHandlerWeb: Error starting VAD: $error');
+        debugPrint('Stack trace: $stackTrace');
+      }
+      _onErrorController.add(error.toString());
+    }
   }
 
-  /// Handle an event from the JS side
-  void handleEvent(String eventType, String payload) {
-    try {
-      Map<String, dynamic> eventData =
-          payload.isNotEmpty ? json.decode(payload) : {};
-
-      switch (eventType) {
-        case 'onError':
-          if (isDebug) {
-            debugPrint('VadHandlerWeb: onError: ${eventData['error']}');
-          }
-          _onErrorController.add(payload);
-          break;
-        case 'onSpeechEnd':
-          if (eventData.containsKey('audioData')) {
-            final List<double> audioData = (eventData['audioData'] as List)
-                .map((e) => (e as num).toDouble())
-                .toList();
-            if (isDebug) {
-              debugPrint(
-                  'VadHandlerWeb: onSpeechEnd: first 5 samples: ${audioData.sublist(0, 5)}');
-            }
-            _onSpeechEndController.add(audioData);
-          } else {
-            if (isDebug) {
-              debugPrint('Invalid VAD Data received: $eventData');
-            }
-          }
-          break;
-        case 'onFrameProcessed':
-          if (eventData.containsKey('probabilities') &&
-              eventData.containsKey('frame')) {
-            final double isSpeech =
-                (eventData['probabilities']['isSpeech'] as num).toDouble();
-            final double notSpeech =
-                (eventData['probabilities']['notSpeech'] as num).toDouble();
-            final List<double> frame = (eventData['frame'] as List)
-                .map((e) => (e as num).toDouble())
-                .toList();
-
-            if (isDebug) {
-              debugPrint(
-                  'VadHandlerWeb: onFrameProcessed: isSpeech: $isSpeech, notSpeech: $notSpeech');
-            }
-
-            _onFrameProcessedController
-                .add((isSpeech: isSpeech, notSpeech: notSpeech, frame: frame));
-          } else {
-            if (isDebug) {
-              debugPrint('Invalid frame data received: $eventData');
-            }
-          }
-          break;
-        case 'onSpeechStart':
-          if (isDebug) {
-            debugPrint('VadHandlerWeb: onSpeechStart');
-          }
-          _onSpeechStartController.add(null);
-          break;
-        case 'onRealSpeechStart':
-          if (isDebug) {
-            debugPrint('VadHandlerWeb: onRealSpeechStart');
-          }
-          _onRealSpeechStartController.add(null);
-          break;
-        case 'onVADMisfire':
-          if (isDebug) {
-            debugPrint('VadHandlerWeb: onVADMisfire');
-          }
-          _onVADMisfireController.add(null);
-          break;
-        default:
-          debugPrint("Unknown event: $eventType");
-      }
-    } catch (e, st) {
-      debugPrint('Error handling event: $e');
-      debugPrint('Stack Trace: $st');
+  /// Callback handlers for VAD events
+  void _onFrameProcessed(SpeechProbabilities probs, Float32List frame) {
+    if (isDebug) {
+      debugPrint(
+          'VadHandlerWeb: onFrameProcessed: isSpeech: ${probs.isSpeech}, notSpeech: ${probs.notSpeech}');
     }
+    _onFrameProcessedController.add((
+      isSpeech: probs.isSpeech,
+      notSpeech: probs.notSpeech,
+      frame: frame.toList(),
+    ));
+  }
+
+  void _onVADMisfire() {
+    if (isDebug) {
+      debugPrint('VadHandlerWeb: onVADMisfire');
+    }
+    _onVADMisfireController.add(null);
+  }
+
+  void _onSpeechStart() {
+    if (isDebug) {
+      debugPrint('VadHandlerWeb: onSpeechStart');
+    }
+    _onSpeechStartController.add(null);
+  }
+
+  void _onSpeechEnd(Float32List audio) {
+    if (isDebug) {
+      debugPrint(
+          'VadHandlerWeb: onSpeechEnd: audio length: ${audio.length}');
+    }
+    _onSpeechEndController.add(audio.toList());
+  }
+
+  void _onSpeechRealStart() {
+    if (isDebug) {
+      debugPrint('VadHandlerWeb: onSpeechRealStart');
+    }
+    _onRealSpeechStartController.add(null);
   }
 
   @override
@@ -216,6 +178,10 @@ class VadHandlerWeb implements VadHandlerBase {
     if (isDebug) {
       debugPrint('VadHandlerWeb: dispose');
     }
+    
+    _micVAD?.destroy();
+    _micVAD = null;
+    
     _onSpeechEndController.close();
     _onFrameProcessedController.close();
     _onSpeechStartController.close();
@@ -229,7 +195,9 @@ class VadHandlerWeb implements VadHandlerBase {
     if (isDebug) {
       debugPrint('VadHandlerWeb: stopListening');
     }
-    stopListeningImpl();
+    
+    _micVAD?.destroy();
+    _micVAD = null;
   }
 
   @override
@@ -237,7 +205,8 @@ class VadHandlerWeb implements VadHandlerBase {
     if (isDebug) {
       debugPrint('VadHandlerWeb: pauseListening');
     }
-    pauseListeningImpl();
+    
+    _micVAD?.pause();
   }
 }
 
