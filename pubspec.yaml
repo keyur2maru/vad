@@ -45,6 +45,7 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   import_sorter: ^4.6.0
   ffigen: ^19.0.0
+  lints: ^4.0.0
 
 topics:
   - vad
