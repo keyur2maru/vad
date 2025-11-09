@@ -83,6 +83,8 @@ Check out the [VAD Package Example App](https://keyur2maru.github.io/vad/) to se
 
 - **16KB Page Size Support:**  Native Android libraries are properly aligned for 16KB page sizes, meeting Google Play requirements for Android 15+ devices.
 
+- **Custom Audio Streams:**  Provide your own audio stream for advanced use cases like custom recording configurations or processing audio from non-microphone sources.
+
 ## Getting Started
 
 ### Prerequisites
@@ -404,8 +406,54 @@ Future<void> startListening({
   String baseAssetPath = 'https://cdn.jsdelivr.net/npm/@keyurmaru/vad@0.0.1/',
   String onnxWASMBasePath = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/',
   RecordConfig? recordConfig,
+  Stream<Uint8List>? audioStream,
 });
 ```
+
+**Custom Audio Stream:**
+- `audioStream` allows you to provide your own audio stream instead of using the built-in recorder. When provided, VadHandler will process audio from this stream instead of creating its own AudioRecorder. The stream should provide PCM16 audio data at 16kHz sample rate, mono channel. This is useful for:
+  - Custom recording configurations not supported by the default recorder
+  - Processing audio from non-microphone sources (files, network streams, etc.)
+  - Integration with existing audio pipelines in your application
+
+Example usage with custom audio stream:
+```dart
+import 'dart:typed_data';
+import 'package:record/record.dart';
+
+// Create your custom audio stream provider
+class CustomAudioProvider {
+  AudioRecorder? _recorder;
+  Stream<Uint8List>? _stream;
+
+  Future<void> initialize() async {
+    _recorder = AudioRecorder();
+    const config = RecordConfig(
+      encoder: AudioEncoder.pcm16bits,
+      sampleRate: 16000,
+      numChannels: 1,
+    );
+    _stream = await _recorder!.startStream(config);
+  }
+
+  Stream<Uint8List>? get audioStream => _stream;
+
+  Future<void> dispose() async {
+    await _recorder?.dispose();
+  }
+}
+
+// Use it with VadHandler
+final provider = CustomAudioProvider();
+await provider.initialize();
+
+await vadHandler.startListening(
+  audioStream: provider.audioStream,  // Pass your custom stream
+  // ... other parameters
+);
+```
+
+See the [example app's CustomAudioStreamProvider](https://github.com/keyur2maru/vad/blob/master/example/lib/custom_audio_stream_provider.dart) for a complete implementation.
 
 #### `stopListening`
 Stops the VAD session. Returns a `Future<void>` that completes when the VAD session has stopped.

@@ -74,6 +74,20 @@
 * Example: Update dependencies
   - Bump `permission_handler` to latest version
   - Bump `audioplayers` to latest version
+* Add support for custom audio streams
+  - API: Add optional `Stream<Uint8List>? audioStream` parameter to `startListening()` method
+  - Core: Allow users to provide their own audio stream instead of using the built-in recorder
+  - Core: When custom stream is provided, VadHandler bypasses internal AudioRecorder setup
+  - Core: Custom stream should provide PCM16 audio data at 16kHz sample rate, mono channel
+  - Example: Add `CustomAudioStreamProvider` demonstration class using the `record` library
+  - Example: Add "Use Custom Audio Stream" toggle in settings dialog
+  - Example: Automatically configure `manageAudioSession: false` when custom stream is used
+  - Use case: Enables advanced scenarios like custom recording configurations, audio from non-microphone sources, or integration with existing audio pipelines
+* Fix AudioRecorder disposal and recreation issue
+  - Core: Change `_audioRecorder` from final to nullable field to allow recreation after disposal
+  - Core: Add logic to recreate AudioRecorder instance in `startListening()` if it was previously disposed
+  - Core: Prevent "Recorder has already been disposed" error when restarting after stop
+  - Core: Properly set `_audioRecorder` to null after disposal in both `stopListening()` and `dispose()` methods
 
 ## 0.0.6
 
