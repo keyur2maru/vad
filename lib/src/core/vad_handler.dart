@@ -4,6 +4,7 @@
 
 // Dart imports:
 import 'dart:async';
+import 'dart:typed_data';
 
 // Package imports:
 import 'package:record/record.dart';
@@ -138,6 +139,8 @@ class VadHandler {
   /// [recordConfig] - Custom audio recording configuration (native platforms only)
   /// [endSpeechPadFrames] - Number of redemption frames to append to speech end, default: 1
   /// [numFramesToEmit] - Number of frames to accumulate before emitting chunk, default: 0 (disabled)
+  /// [audioStream] - Custom audio stream to use instead of the built-in recorder. When provided, the internal AudioRecorder is not used.
+  ///                 Should provide PCM16 audio data at 16kHz sample rate, mono channel.
   Future<void> startListening(
       {double positiveSpeechThreshold = 0.5,
       double negativeSpeechThreshold = 0.35,
@@ -153,7 +156,8 @@ class VadHandler {
           'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/',
       RecordConfig? recordConfig,
       int endSpeechPadFrames = 1,
-      int numFramesToEmit = 0}) async {
+      int numFramesToEmit = 0,
+      Stream<Uint8List>? audioStream}) async {
     if (_isDebug) {
       print('VadHandler: startListening called with model: $model');
     }
@@ -257,71 +261,88 @@ class VadHandler {
       }
     }
 
-    // Create a new AudioRecorder if needed (e.g., after stopListening disposed it)
-    if (_audioRecorder == null) {
-      if (_isDebug) {
-        print('VadHandler: Creating new AudioRecorder instance');
-      }
-      _audioRecorder = AudioRecorder();
-    }
-
-    if (_isDebug) {
-      print('VadHandler: Checking audio permissions');
-    }
-
-    bool hasPermission = await _audioRecorder!.hasPermission();
-    if (!hasPermission) {
-      _onErrorController.add('VadHandler: No permission to record audio.');
-      print('VadHandler: No permission to record audio.');
-      return;
-    }
-
-    if (_isDebug) {
-      print('VadHandler: Audio permissions granted');
-    }
-
     _isPaused = false;
 
-    if (_isDebug) {
-      print('VadHandler: Creating audio recorder config');
-    }
+    // Use custom audio stream if provided, otherwise use built-in recorder
+    if (audioStream != null) {
+      if (_isDebug) {
+        print('VadHandler: Using custom audio stream');
+      }
 
-    final config = recordConfig ??
-        const RecordConfig(
-            encoder: AudioEncoder.pcm16bits,
-            sampleRate: 16000,
-            bitRate: 16,
-            numChannels: 1,
-            echoCancel: true,
-            autoGain: true,
-            noiseSuppress: true,
-            androidConfig: AndroidRecordConfig(
-              audioSource: AndroidAudioSource.voiceCommunication,
-              audioManagerMode: AudioManagerMode.modeInCommunication,
-              speakerphone: true,
-              manageBluetooth: true,
-              useLegacy: false,
-            ));
-    if (_isDebug) {
-      print('VadHandler: Starting audio stream');
-    }
-
-    try {
-      final stream = await _audioRecorder!.startStream(config);
-
-      _audioStreamSubscription = stream.listen((data) async {
+      _audioStreamSubscription = audioStream.listen((data) async {
         if (!_isPaused) {
           await _vadIterator?.processAudioData(data);
         }
       });
 
       if (_isDebug) {
-        print('VadHandler: Audio stream started successfully');
+        print('VadHandler: Custom audio stream connected successfully');
       }
-    } catch (e) {
-      print('VadHandler: Error starting audio stream: $e');
-      _onErrorController.add('Error starting audio stream: $e');
-      rethrow;
+    } else {
+      // Create a new AudioRecorder if needed (e.g., after stopListening disposed it)
+      if (_audioRecorder == null) {
+        if (_isDebug) {
+          print('VadHandler: Creating new AudioRecorder instance');
+        }
+        _audioRecorder = AudioRecorder();
+      }
+
+      if (_isDebug) {
+        print('VadHandler: Checking audio permissions');
+      }
+
+      bool hasPermission = await _audioRecorder!.hasPermission();
+      if (!hasPermission) {
+        _onErrorController.add('VadHandler: No permission to record audio.');
+        print('VadHandler: No permission to record audio.');
+        return;
+      }
+
+      if (_isDebug) {
+        print('VadHandler: Audio permissions granted');
+      }
+
+      if (_isDebug) {
+        print('VadHandler: Creating audio recorder config');
+      }
+
+      final config = recordConfig ??
+          const RecordConfig(
+              encoder: AudioEncoder.pcm16bits,
+              sampleRate: 16000,
+              bitRate: 16,
+              numChannels: 1,
+              echoCancel: true,
+              autoGain: true,
+              noiseSuppress: true,
+              androidConfig: AndroidRecordConfig(
+                audioSource: AndroidAudioSource.voiceCommunication,
+                audioManagerMode: AudioManagerMode.modeInCommunication,
+                speakerphone: true,
+                manageBluetooth: true,
+                useLegacy: false,
+              ));
+      if (_isDebug) {
+        print('VadHandler: Starting audio stream');
+      }
+
+      try {
+        final stream = await _audioRecorder!.startStream(config);
+
+        _audioStreamSubscription = stream.listen((data) async {
+          if (!_isPaused) {
+            await _vadIterator?.processAudioData(data);
+          }
+        });
+
+        if (_isDebug) {
+          print('VadHandler: Audio stream started successfully');
+        }
+      } catch (e) {
+        print('VadHandler: Error starting audio stream: $e');
+        _onErrorController.add('Error starting audio stream: $e');
+        rethrow;
+      }
     }
   }
 

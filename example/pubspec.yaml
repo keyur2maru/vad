@@ -15,6 +15,7 @@ dependencies:
   audioplayers: ^6.5.1
   vad:
     path: ../
+  record: ^6.1.2
 
 dev_dependencies:
   flutter_test:

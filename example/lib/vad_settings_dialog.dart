@@ -30,6 +30,9 @@ class VadSettings {
   int numFramesToEmit;
   bool enableChunkEmission;
 
+  // Custom audio stream settings
+  bool useCustomAudioStream;
+
   VadSettings({
     this.model = VadModel.v5,
     this.frameSamples = 512,
@@ -42,6 +45,7 @@ class VadSettings {
     this.submitUserSpeechOnPause = false,
     this.numFramesToEmit = 10,
     this.enableChunkEmission = false,
+    this.useCustomAudioStream = false,
   });
 
   // Clone the settings
@@ -58,6 +62,7 @@ class VadSettings {
       submitUserSpeechOnPause: submitUserSpeechOnPause,
       numFramesToEmit: numFramesToEmit,
       enableChunkEmission: enableChunkEmission,
+      useCustomAudioStream: useCustomAudioStream,
     );
   }
 
@@ -74,6 +79,7 @@ class VadSettings {
       endSpeechPadFrames = 8;
       numFramesToEmit = 10;
       enableChunkEmission = false;
+      useCustomAudioStream = false;
     } else {
       // Default v5 values
       frameSamples = 512;
@@ -85,6 +91,7 @@ class VadSettings {
       endSpeechPadFrames = 8;
       numFramesToEmit = 10;
       enableChunkEmission = true;
+      useCustomAudioStream = false;
     }
   }
 
@@ -110,7 +117,7 @@ class VadSettings {
 
   @override
   String toString() {
-    return 'VadSettings(model: $model, frameSamples: $frameSamples, minSpeechFrames: $minSpeechFrames, preSpeechPadFrames: $preSpeechPadFrames, redemptionFrames: $redemptionFrames, endSpeechPadFrames: $endSpeechPadFrames, positiveSpeechThreshold: $positiveSpeechThreshold, negativeSpeechThreshold: $negativeSpeechThreshold, submitUserSpeechOnPause: $submitUserSpeechOnPause, numFramesToEmit: $numFramesToEmit, enableChunkEmission: $enableChunkEmission)';
+    return 'VadSettings(model: $model, frameSamples: $frameSamples, minSpeechFrames: $minSpeechFrames, preSpeechPadFrames: $preSpeechPadFrames, redemptionFrames: $redemptionFrames, endSpeechPadFrames: $endSpeechPadFrames, positiveSpeechThreshold: $positiveSpeechThreshold, negativeSpeechThreshold: $negativeSpeechThreshold, submitUserSpeechOnPause: $submitUserSpeechOnPause, numFramesToEmit: $numFramesToEmit, enableChunkEmission: $enableChunkEmission, useCustomAudioStream: $useCustomAudioStream)';
   }
 }
 
@@ -541,6 +548,24 @@ class _VadSettingsDialogState extends State<VadSettingsDialog> {
                   },
                 ),
                 const Text('Submit User Speech On Pause'),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Use Custom Audio Stream
+            Row(
+              children: [
+                Checkbox(
+                  value: tempSettings.useCustomAudioStream,
+                  onChanged: (value) {
+                    setState(() {
+                      tempSettings.useCustomAudioStream = value ?? false;
+                    });
+                  },
+                ),
+                const Expanded(
+                  child: Text('Use Custom Audio Stream'),
+                ),
               ],
             ),
           ],
