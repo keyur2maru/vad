@@ -78,7 +78,8 @@ class _VadUIState extends State<VadUI> {
         ),
         android: const audioplayers.AudioContextAndroid(
           contentType: audioplayers.AndroidContentType.speech,
-          usageType: audioplayers.AndroidUsageType.voiceCommunication,
+          usageType: audioplayers.AndroidUsageType.media,
+          audioFocus: audioplayers.AndroidAudioFocus.gainTransientMayDuck,
         ),
       ),
     );
