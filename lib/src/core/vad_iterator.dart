@@ -301,7 +301,8 @@ class VadIterator {
 
           // Calculate the audio buffer with endSpeechPadFrames
           final framesToRemove = _redemptionFrames - _endSpeechPadFrames;
-          const startIndex = 0;  // Always start from beginning for complete speech segment
+          const startIndex =
+              0; // Always start from beginning for complete speech segment
 
           final audioBufferPad = _processAudioBuffer(
             frames: _speechBuffer,
@@ -451,7 +452,8 @@ class VadIterator {
   }
 
   /// Emits a chunk VadEvent with the given frames and message
-  void _emitChunkEvent(List<Float32List> frames, String message, {bool isFinal = false}) {
+  void _emitChunkEvent(List<Float32List> frames, String message,
+      {bool isFinal = false}) {
     final audioData = _combineFrames(frames);
     _onVadEvent?.call(VadEvent(
       type: VadEventType.chunk,
@@ -484,7 +486,8 @@ class VadIterator {
 
       if (frames.isNotEmpty) {
         _emitChunkEvent(frames,
-            'Final audio chunk emitted at ${_getCurrentTimestamp().toStringAsFixed(3)}s', isFinal: true);
+            'Final audio chunk emitted at ${_getCurrentTimestamp().toStringAsFixed(3)}s',
+            isFinal: true);
       }
     }
   }

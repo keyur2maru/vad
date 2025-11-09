@@ -1,6 +1,6 @@
 name: vad
 description: "VAD is a cross-platform Voice Activity Detection system, allowing Flutter applications to seamlessly handle various VAD events using Silero VAD v4/v5 models."
-version: 0.0.7
+version: 0.0.7+1
 repository: https://github.com/keyur2maru/vad
 issue_tracker: https://github.com/keyur2maru/vad/issues
 homepage: https://keyur2maru.github.io/vad/

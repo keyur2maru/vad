@@ -1,3 +1,7 @@
+## 0.0.7+1
+
+* Apply dart format to all files to meet pub.dev static analysis requirements
+
 ## 0.0.7
 
 * Add Android 16KB page size support
