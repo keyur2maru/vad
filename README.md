@@ -7,9 +7,13 @@
 </p>
 
 
-VAD is a Flutter library for Voice Activity Detection (VAD) across **iOS** , **Android** , and **Web**  platforms. This package allows applications to start and stop VAD-based listening and handle various VAD events seamlessly.
-Under the hood, the VAD Package uses `dart:js_interop` for Web to run [VAD JavaScript library](https://github.com/ricky0123/vad) and [onnxruntime](https://github.com/gtbluesky/onnxruntime_flutter) for iOS and Android utilizing onnxruntime library with full-feature parity with the JavaScript library.
+VAD is a Flutter library for Voice Activity Detection (VAD) across **iOS**, **Android**, **Web**, **macOS**, **Windows**, and **Linux** platforms. This package allows applications to start and stop VAD-based listening and handle various VAD events seamlessly.
+
+Under the hood, the VAD Package uses direct FFI bindings to ONNX Runtime for native platforms (iOS, Android, macOS, Windows, Linux) and `dart:js_interop` for Web. All platforms utilize the Silero VAD models with full-feature parity across platforms.
+
 The package provides a simple API to start and stop VAD listening, configure VAD parameters, and handle VAD events such as speech start, speech end, errors, and misfires.
+
+**Note:** Echo cancellation is not available on Windows and Linux platforms due to limitations in the underlying audio capture library.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/keyur2maru/vad/master/img/screenshot-1.png" alt="Screenshot 1" />
@@ -72,11 +76,13 @@ Check out the [VAD Package Example App](https://keyur2maru.github.io/vad/) to se
 
 ## Features
 
-- **Cross-Platform Support:**  Works seamlessly on iOS, Android, and Web.
+- **Cross-Platform Support:**  Works seamlessly on iOS, Android, Web, macOS, Windows, and Linux.
 
 - **Event Streams:**  Listen to events such as speech start, real speech start, speech end, speech misfire, frame processed, and errors.
 
 - **Silero V4 and V5 Models:**  Supports both Silero VAD v4 and v5 models.
+
+- **16KB Page Size Support:**  Native Android libraries are properly aligned for 16KB page sizes, meeting Google Play requirements for Android 15+ devices.
 
 ## Getting Started
 
@@ -384,7 +390,7 @@ Notes:
 - `model` parameter can be set to 'legacy' or 'v5' to use the respective VAD model. Default is 'legacy'.
 - `baseAssetPath` specifies the base URL/path for VAD model files (.onnx). Defaults to CDN (`https://cdn.jsdelivr.net/npm/@keyurmaru/vad@0.0.1/`) but can be overridden for custom hosting. **<u>Applicable for all platforms.</u>**
 - `onnxWASMBasePath` specifies the base URL/path for onnxruntime WASM files. Defaults to CDN (`https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/`) but can be overridden for custom hosting. **<u>Only applicable for the Web platform.</u>**
-- `recordConfig` allows you to provide custom recording configuration for non-web platforms (iOS/Android). If not provided, default configuration with 16kHz sample rate, PCM16 encoding, echo cancellation, auto gain, and noise suppression will be used. **<u>Only applicable for non-web platforms (iOS/Android).</u>**
+- `recordConfig` allows you to provide custom recording configuration for native platforms (iOS, Android, macOS, Windows, Linux). If not provided, default configuration with 16kHz sample rate, PCM16 encoding, echo cancellation, auto gain, and noise suppression will be used. **<u>Only applicable for native platforms. Note: Echo cancellation is not available on Windows and Linux.</u>**
 
 ```dart
 Future<void> startListening({
@@ -574,8 +580,11 @@ This fix leverages `AudioManager.MODE_IN_COMMUNICATION` and `AudioManager.setSpe
 The VAD Package has been tested on the following platforms:
 
 - **iOS:**  Tested on iPhone 15 Pro Max running iOS 18.1.
-- **Android:**  Tested on Lenovo Tab M8 Running Android 10.
+- **Android:**  Tested on Lenovo Tab M8 running Android 10, Samsung S20 running Android 15.
 - **Web:**  Tested on Chrome Mac/Windows/Android/iOS, Safari Mac/iOS.
+- **macOS:**  Tested on macOS Sequoia 15.1.
+- **Windows:**  Tested on Windows 11.
+- **Linux:**  Tested on Ubuntu 24.04.
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a pull request or open an issue if you encounter any problems or have suggestions for improvements.

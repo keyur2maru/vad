@@ -1,3 +1,80 @@
+## 0.0.7
+
+* Add Android 16KB page size support
+  - Android: Bump ONNX Runtime to 1.22.0 which includes native 16KB page size support
+  - Android: All native libraries (`libonnxruntime.so`, `libonnxruntime4j_jni.so`) are now properly aligned for 16KB page sizes
+  - Android: Plugin is now fully compatible with Android 15+ devices and Google Play's 16KB page size requirement
+* **BREAKING CHANGE:** Asset management changes - models now loaded from CDN by default
+  - Core: Remove bundled assets from package to reduce package size
+  - Core: Introduce companion NPM package `@keyurmaru/vad` to host ONNX model files via jsDelivr CDN
+  - Core: Update `baseAssetPath` and `onnxWASMBasePath` parameters to default to CDN URLs (can be overridden for offline/self-hosted use)
+  - Core: Delete `lib/assets` directory and its contents
+  - Migration: For offline support, download model files and set `baseAssetPath` parameter in `startListening()`
+* **BREAKING CHANGE:** Model identifier renamed from 'legacy' to 'v4'
+  - API: Rename model parameter value from 'legacy' to 'v4' for clarity
+  - Migration: Update `model: 'legacy'` to `model: 'v4'` in `startListening()` calls
+* Internal architectural refactor to unify cross-platform implementation
+  - Internal: Remove platform-specific internal classes (`VadHandlerWeb`, `VadHandlerNonWeb`, `VadIteratorWeb`, `VadIteratorNonWeb`)
+  - Internal: Remove internal abstract base classes (`VadHandlerBase`, `VadIteratorBase`)
+  - Internal: Introduce `VadInference` abstraction layer as platform split point
+  - Core: Use `record` package for cross-platform audio capture, replacing custom web audio implementation
+  - Example: Rename `RecordingModel` enum to `VadModel` in example app
+* Internal native implementation overhauled with FFI for better performance
+  - Internal: Replace `onnxruntime` package dependency with direct FFI-based implementation
+  - Internal: Add ONNX Runtime C API headers and generate Dart bindings using `ffigen`
+  - Internal: Create Dart wrappers for ONNX structs (`OrtEnv`, `OrtSession`, `OrtValue`)
+  - Internal: Implement `OrtIsolateSession` to run native inference in separate isolate
+  - Internal: Restructure `lib/` into `core` and `platform` directories
+  - Internal: Introduce abstract `VadModel` class to unify inference logic
+* Add desktop platform support (Windows, macOS, Linux)
+  - Platform: Add build configurations for Windows, macOS, and Linux desktop applications
+  - Platform: Bundle pre-compiled x64 and arm64 ONNX Runtime binaries for Windows and Linux
+  - Platform: Add CMakeLists.txt for each desktop platform to handle binary packaging
+  - Platform: Add macOS podspec with dependency on `onnxruntime-objc` pod
+  - Platform: Update Dart FFI bindings to dynamically detect OS and CPU architecture at runtime
+  - Example: Add macOS example app
+  - Example: Add Linux example app
+* Rewrite web VAD implementation in pure Dart
+  - Web: Remove pre-compiled JavaScript bridge (vad_web.js, bundle.min.js)
+  - Web: Implement pure Dart web support using `dart:js_interop` to directly communicate with onnxruntime-web
+  - Web: Add `MicVAD` class in `lib/src/web/audio_node_vad.dart` to manage audio pipeline using `AudioContext` and dynamically generated `AudioWorkletProcessor`
+  - Web: Add typed wrappers for `onnxruntime-web` in `lib/src/web/onnx_runtime_web.dart`
+  - Web: Add ScriptProcessorNode fallback from AudioWorklet for better browser compatibility (older browsers and non-secure contexts)
+* **BREAKING CHANGE:** `onEmitChunk` stream type changed to include `isFinal` flag
+  - API: Change `onEmitChunk` from `Stream<List<double>>` to `Stream<({List<double> samples, bool isFinal})>`
+  - API: Add `onEmitChunk` stream for real-time audio chunk emission during active speech
+  - API: Add `isFinal` flag to mark the last chunk of a speech utterance
+  - API: Add `numFramesToEmit` parameter to `startListening()` to enable chunking (default: 0, disabled)
+  - API: Add `endSpeechPadFrames` parameter to `startListening()` to control audio padding at speech end (default: 1 for v4, 3 for v5)
+  - Core: Update `VadIterator` implementations to manage frame buffers and emit chunk events periodically and at speech end
+  - Example: Update example app to demonstrate chunk emission feature with playback UI for individual chunks
+  - Migration: Update listeners from `vadHandler.onEmitChunk.listen((samples) { ... })` to `vadHandler.onEmitChunk.listen((chunk) { final samples = chunk.samples; final isFinal = chunk.isFinal; ... })`
+* Network model loading support
+  - Core: Update native implementation to support loading models from network URLs using `HttpClient`
+* Fix Android audio playback interference with VAD detection
+  - Example: Change audio player configuration to use `AndroidUsageType.media` instead of `voiceCommunication`
+  - Example: Add `AndroidAudioFocus.gainTransientMayDuck` to prevent recorder from receiving `AUDIOFOCUS_LOSS` when playing back recordings
+  - Example: Allow continuous speech detection during playback without requiring manual stop/start
+* Fix iOS minimum version requirement
+  - Platform: Correct minimum iOS version from 16.0 to 15.1 in `vad.podspec` to align with `onnxruntime-objc` dependency support
+  - Example: Update iOS example app configuration to match 15.1 minimum deployment target
+* Use forked `record` dependency for macOS echo cancellation fix
+  - Dependencies: Temporarily override `record` and `record_macos` packages to point to git repository with echo cancellation fix
+  - Dependencies: Will be removed once fix is merged into official release
+* Modernize example app build configurations
+  - Example: Migrate Android Gradle scripts from Groovy to Kotlin DSL (.kts)
+  - Example: Upgrade Gradle wrapper from 8.3 to 8.12
+  - Example: Bump Java compatibility to version 11
+  - Example: Update Android package name to `com.example.vad_example`
+  - Example: Clean up iOS Podfile, removing obsolete settings
+  - Example: Update Xcode project files to match new dependencies
+* Update package metadata
+  - Pubspec: Add `homepage` and `issue_tracker` fields
+* Example: Expose `RecordConfig` from `record` package for detailed audio input configuration
+* Example: Update dependencies
+  - Bump `permission_handler` to latest version
+  - Bump `audioplayers` to latest version
+
 ## 0.0.6
 
 * **BREAKING CHANGE:** Convert all VAD APIs to async Future-based methods for better async/await support
