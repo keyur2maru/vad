@@ -7,5 +7,6 @@ export 'package:record/record.dart'
         AndroidRecordConfig,
         IosRecordConfig,
         AndroidAudioSource,
+        AndroidService,
         AudioManagerMode,
         IosAudioCategoryOption;

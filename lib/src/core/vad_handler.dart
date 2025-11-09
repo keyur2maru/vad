@@ -17,7 +17,7 @@ import 'package:vad/src/core/vad_event.dart';
 /// Provides cross-platform VAD capabilities using Silero models with unified
 /// implementation using the record library for both web and native platforms.
 class VadHandler {
-  final AudioRecorder _audioRecorder = AudioRecorder();
+  AudioRecorder? _audioRecorder;
   VadIterator? _vadIterator;
   StreamSubscription<List<int>>? _audioStreamSubscription;
 
@@ -257,11 +257,19 @@ class VadHandler {
       }
     }
 
+    // Create a new AudioRecorder if needed (e.g., after stopListening disposed it)
+    if (_audioRecorder == null) {
+      if (_isDebug) {
+        print('VadHandler: Creating new AudioRecorder instance');
+      }
+      _audioRecorder = AudioRecorder();
+    }
+
     if (_isDebug) {
       print('VadHandler: Checking audio permissions');
     }
 
-    bool hasPermission = await _audioRecorder.hasPermission();
+    bool hasPermission = await _audioRecorder!.hasPermission();
     if (!hasPermission) {
       _onErrorController.add('VadHandler: No permission to record audio.');
       print('VadHandler: No permission to record audio.');
@@ -286,13 +294,20 @@ class VadHandler {
             numChannels: 1,
             echoCancel: true,
             autoGain: true,
-            noiseSuppress: true);
+            noiseSuppress: true,
+            androidConfig: AndroidRecordConfig(
+              audioSource: AndroidAudioSource.voiceCommunication,
+              audioManagerMode: AudioManagerMode.modeInCommunication,
+              speakerphone: true,
+              manageBluetooth: true,
+              useLegacy: false,
+            ));
     if (_isDebug) {
       print('VadHandler: Starting audio stream');
     }
 
     try {
-      final stream = await _audioRecorder.startStream(config);
+      final stream = await _audioRecorder!.startStream(config);
 
       _audioStreamSubscription = stream.listen((data) async {
         if (!_isPaused) {
@@ -326,9 +341,12 @@ class VadHandler {
         _audioStreamSubscription = null;
       }
 
-      if (_isDebug) print('VadHandler: Stopping audio recorder');
-      await _audioRecorder.stop();
-      await _audioRecorder.dispose();
+      if (_audioRecorder != null) {
+        if (_isDebug) print('VadHandler: Stopping audio recorder');
+        await _audioRecorder!.stop();
+        await _audioRecorder!.dispose();
+        _audioRecorder = null;
+      }
 
       if (_isDebug) print('VadHandler: Resetting VAD iterator');
       _vadIterator?.reset();
@@ -357,8 +375,11 @@ class VadHandler {
     if (_isDebug) print('VadHandler: stopping listening');
     await stopListening();
 
-    if (_isDebug) print('VadHandler: disposing audio recorder');
-    await _audioRecorder.dispose();
+    if (_audioRecorder != null) {
+      if (_isDebug) print('VadHandler: disposing audio recorder');
+      await _audioRecorder!.dispose();
+      _audioRecorder = null;
+    }
 
     if (_isDebug) {
       print('VadHandler: canceling audio stream subscription');

@@ -62,7 +62,6 @@ The package provides a simple API to start and stop VAD listening, configure VAD
         + [iOS Issues](#ios-issues)
             - [TestFlight Build Error: "Failed to lookup symbol 'OrtGetApiBase'"](#testflight-build-error-failed-to-lookup-symbol-ortgetapibase)
         + [Android Issues](#android-issues)
-            - [Missing libonnxruntime.so Library Error](#missing-libonnxruntimeso-library-error)
             - [Echo Cancellation Not Working on Some Android Devices](#echo-cancellation-not-working-on-some-android-devices)
     * [Tested Platforms](#tested-platforms)
     * [Contributing](#contributing)
@@ -510,48 +509,11 @@ flutter: VAD model initialization failed: Invalid argument(s): Failed to lookup 
 
 ### Android Issues
 
-#### Missing libonnxruntime.so Library Error
-
-Some Android devices may report this error:
-```
-VAD model initialization failed: Invalid argument(s): Failed to load dynamic library 'libonnxruntime.so': dlopen failed: library "libonnxruntime.so" not found
-```
-
-**Fix:** Use a specific commit of the onnxruntime package by adding this to your `pubspec.yaml`:
-
-```yaml
-dependency_overrides:
-  onnxruntime:
-    git:
-      url: https://github.com/gtbluesky/onnxruntime_flutter.git
-      ref: 526de653892a84af3e1a541e49d4f4b3042bb2cd
-```
-
-*Solution found at: https://github.com/gtbluesky/onnxruntime_flutter/pull/31*
-
 #### Echo Cancellation Not Working on Some Android Devices
 
 Some Android devices, particularly Samsung devices (e.g., Samsung S20), may experience issues with echo cancellation not functioning properly, while the same code works fine on other devices (e.g., Lenovo Tab M8).
 
-**Fix:** Use a patched version of the record package with improved audio configuration. Add this to your `pubspec.yaml`:
-
-```yaml
-dependency_overrides:
-  record:
-    git:
-      url: https://github.com/keyur2maru/record.git
-      path: record
-  record_platform_interface:
-    git:
-      url: https://github.com/keyur2maru/record.git
-      path: record_platform_interface
-  record_android:
-    git:
-      url: https://github.com/keyur2maru/record.git
-      path: record_android
-```
-
-**Usage example:**
+**Fix:** Configure Android-specific audio settings in the RecordConfig. The VAD package uses improved audio configuration by default, but you can also customize it:
 
 ```dart
 await _vadHandler.startListening(
@@ -565,16 +527,14 @@ await _vadHandler.startListening(
     androidConfig: AndroidRecordConfig(
       audioSource: AndroidAudioSource.voiceCommunication,
       audioManagerMode: AudioManagerMode.modeInCommunication,
-      setSpeakerphoneOn: true,
+      speakerphone: true,
+      manageBluetooth: true,
     ),
   ),
 );
 ```
 
-This fix leverages `AudioManager.MODE_IN_COMMUNICATION` and `AudioManager.setSpeakerPhone(true)` along with the `android.permission.MODIFY_AUDIO_SETTINGS` permission to resolve echo cancellation issues.
-
-*Note: An official fix is pending in the upstream record package: https://github.com/llfbandit/record/commit/a24931a8e344410b68f36b1182a600f4e33bff42*
-
+This configuration leverages `AudioManager.MODE_IN_COMMUNICATION` and speakerphone mode along with the `android.permission.MODIFY_AUDIO_SETTINGS` permission to resolve echo cancellation issues. The VAD package uses these settings by default.
 
 ## Tested Platforms
 The VAD Package has been tested on the following platforms:
@@ -590,7 +550,7 @@ The VAD Package has been tested on the following platforms:
 Contributions are welcome! Please feel free to submit a pull request or open an issue if you encounter any problems or have suggestions for improvements.
 
 ## Acknowledgements
-Special thanks to [Ricky0123](https://github.com/ricky0123) for creating the [VAD JavaScript library](https://github.com/ricky0123/vad), [gtbluesky](https://github.com/gtbluesky) for building the [onnxruntime package](https://github.com/gtbluesky/onnxruntime_flutter) and Silero Team for the [VAD model](https://github.com/snakers4/silero-vad) used in the library.
+Special thanks to [Ricky0123](https://github.com/ricky0123) for creating the [VAD JavaScript library](https://github.com/ricky0123/vad), the Silero Team for the [VAD model](https://github.com/snakers4/silero-vad) used in the library, and Microsoft for the [ONNX Runtime](https://github.com/microsoft/onnxruntime) that powers the model inference.
 
 
 ## License
