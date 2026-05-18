@@ -10,8 +10,9 @@ import 'dart:typed_data';
 import 'package:record/record.dart';
 
 // Project imports:
-import 'package:vad/src/core/vad_iterator.dart';
 import 'package:vad/src/core/vad_event.dart';
+import 'package:vad/src/core/vad_iterator.dart';
+import 'package:vad/src/core/vad_log.dart';
 
 /// Platform-agnostic Voice Activity Detection handler for real-time audio processing
 ///
@@ -26,6 +27,7 @@ class VadHandler {
   bool _isInitialized = false;
   bool _submitUserSpeechOnPause = false;
   bool _isPaused = false;
+  VadLogCallback? _onLog;
 
   // Track current model parameters to detect changes
   String? _currentModel;
@@ -52,9 +54,13 @@ class VadHandler {
 
   /// Constructor
   /// [isDebug] - Whether to enable debug logging (default: false)
-  VadHandler._({bool isDebug = false}) {
+  /// [onLog] - Optional callback that receives model-init breadcrumb logs
+  VadHandler._({bool isDebug = false, VadLogCallback? onLog}) {
     _isDebug = isDebug;
+    _onLog = onLog;
   }
+
+  void _log(String message) => (_onLog ?? print)(message);
 
   /// Stream of speech end events containing processed audio data as floating point samples
   Stream<List<double>> get onSpeechEnd => _onSpeechEndController.stream;
@@ -236,6 +242,7 @@ class VadHandler {
         onnxWASMBasePath: onnxWASMBasePath,
         endSpeechPadFrames: endSpeechPadFrames,
         numFramesToEmit: numFramesToEmit,
+        onLog: _onLog,
       );
       _vadIterator?.setVadEventCallback(_handleVadEvent);
 
@@ -297,7 +304,7 @@ class VadHandler {
       bool hasPermission = await _audioRecorder!.hasPermission();
       if (!hasPermission) {
         _onErrorController.add('VadHandler: No permission to record audio.');
-        print('VadHandler: No permission to record audio.');
+        _log('VadHandler: No permission to record audio.');
         return;
       }
 
@@ -342,7 +349,7 @@ class VadHandler {
           print('VadHandler: Audio stream started successfully');
         }
       } catch (e) {
-        print('VadHandler: Error starting audio stream: $e');
+        _log('VadHandler: Error starting audio stream: $e');
         _onErrorController.add('Error starting audio stream: $e');
         rethrow;
       }
@@ -379,7 +386,7 @@ class VadHandler {
       if (_isDebug) print('VadHandler: stopListening completed');
     } catch (e) {
       _onErrorController.add(e.toString());
-      print('Error stopping audio stream: $e');
+      _log('VadHandler: Error stopping audio stream: $e');
     }
   }
 
@@ -438,10 +445,15 @@ class VadHandler {
   /// Factory method to create VAD handler instance
   ///
   /// [isDebug] - Enable debug logging for troubleshooting (default: false)
+  /// [onLog] - Optional callback that receives model-init breadcrumb logs.
+  /// When provided, the always-on log line emitted immediately before each
+  /// ONNX Runtime session creation is routed here instead of `print`. Wire it
+  /// to your crash reporter (e.g. `FirebaseCrashlytics.instance.log`) so the
+  /// breadcrumb lands in crash reports if the native session creation fails.
   ///
   /// Uses unified implementation with record library for both web and native platforms.
   /// Supports Silero VAD models v4 and v5.
-  static VadHandler create({bool isDebug = false}) {
-    return VadHandler._(isDebug: isDebug);
+  static VadHandler create({bool isDebug = false, VadLogCallback? onLog}) {
+    return VadHandler._(isDebug: isDebug, onLog: onLog);
   }
 }

@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 // Project imports:
 import 'package:vad/src/core/vad_event.dart';
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 import 'package:vad/src/utils/model_utils.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_session.dart';
@@ -40,15 +41,23 @@ class SileroV4Model implements VadModel {
     int sampleRate,
     bool isDebug, {
     OrtThreadingConfig? threadingConfig,
+    VadLogCallback? onLog,
   }) async {
+    final log = onLog ?? print;
+    final config = threadingConfig ?? OrtThreadingConfig.platformOptimal();
+    final bytes = await _loadModelBytes(modelPath);
+    final context =
+        'model=v4 path=$modelPath bytes=${bytes.length} sampleRate=$sampleRate '
+        'intraOp=${config.intraOpNumThreads} interOp=${config.interOpNumThreads} '
+        'os=${Platform.operatingSystem} osVersion=${Platform.operatingSystemVersion}';
+    log('VadModel: creating OrtSession ($context)');
+
     try {
-      final config = threadingConfig ?? OrtThreadingConfig.platformOptimal();
       final sessionOptions = OrtSessionOptions()
         ..setInterOpNumThreads(config.interOpNumThreads)
         ..setIntraOpNumThreads(config.intraOpNumThreads)
         ..setSessionGraphOptimizationLevel(GraphOptimizationLevel.ortEnableAll);
 
-      final bytes = await _loadModelBytes(modelPath);
       final session = OrtSession.fromBuffer(bytes, sessionOptions);
 
       if (isDebug) {
@@ -60,8 +69,8 @@ class SileroV4Model implements VadModel {
       }
 
       return SileroV4Model._(session, sessionOptions, sampleRate);
-    } catch (e) {
-      print('Error creating SileroV4Model: $e');
+    } catch (e, st) {
+      log('VadModel: OrtSession creation failed ($context): $e\n$st');
       rethrow;
     }
   }

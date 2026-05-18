@@ -1,5 +1,6 @@
 // lib/src/core/vad_inference.dart
 
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 import 'package:vad/src/platform/web/inference/vad_inference_impl.dart'
     if (dart.library.io) 'package:vad/src/platform/native/inference/vad_inference_impl.dart'
@@ -18,6 +19,7 @@ abstract class VadInference {
   /// [isDebug] - Enable debug logging
   /// [onnxWASMBasePath] - Base URL for ONNX Runtime WASM files (Web only)
   /// [threadingConfig] - Threading configuration (Native only)
+  /// [onLog] - Optional callback for routing model-init breadcrumb logs
   static Future<VadInference> create({
     required String model,
     required String modelPath,
@@ -25,6 +27,7 @@ abstract class VadInference {
     required bool isDebug,
     String? onnxWASMBasePath,
     dynamic threadingConfig,
+    VadLogCallback? onLog,
   }) {
     return implementation.createVadInference(
       model: model,
@@ -33,6 +36,7 @@ abstract class VadInference {
       isDebug: isDebug,
       onnxWASMBasePath: onnxWASMBasePath,
       threadingConfig: threadingConfig,
+      onLog: onLog,
     );
   }
 

@@ -2,6 +2,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:vad/src/core/vad_inference.dart';
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 import 'package:vad/src/platform/web/inference/silero_v4_model.dart';
 import 'package:vad/src/platform/web/inference/silero_v5_model.dart';
@@ -29,6 +30,7 @@ Future<VadInference> createVadInference({
   required bool isDebug,
   String? onnxWASMBasePath,
   dynamic threadingConfig, // Unused on web
+  VadLogCallback? onLog,
 }) async {
   if (isDebug) {
     print('VadInferenceWeb: Creating $model model from $modelPath');
@@ -36,9 +38,9 @@ Future<VadInference> createVadInference({
 
   VadModel vadModel;
   if (model == 'v5') {
-    vadModel = await SileroV5Model.create(modelPath, onnxWASMBasePath);
+    vadModel = await SileroV5Model.create(modelPath, onnxWASMBasePath, onLog);
   } else {
-    vadModel = await SileroV4Model.create(modelPath, onnxWASMBasePath);
+    vadModel = await SileroV4Model.create(modelPath, onnxWASMBasePath, onLog);
   }
 
   return _VadInferenceImpl(vadModel);

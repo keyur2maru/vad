@@ -1,3 +1,19 @@
+## 0.0.8
+
+* Add `onLog` callback to `VadHandler.create` for routing production log lines to consumer-side telemetry (Crashlytics, Sentry, Bugsnag, etc.) without zone or `debugPrint` overrides
+  - API: Add optional `VadLogCallback? onLog` parameter to `VadHandler.create`
+  - API: Add `VadLogCallback` typedef (`void Function(String message)`) exported from `package:vad/vad.dart`
+  - Core: Thread `onLog` through `VadIterator.create` → `VadInference.create` → native/web inference factories → Silero v4/v5 models
+  - Coverage: Route all non-debug failure log lines through the callback when provided — model session-creation errors (native + web), inference errors, frame-processing errors, audio-stream and microphone-permission failures
+  - Behavior: When `onLog` is null, log lines continue to go to `print`/logcat as before. Verbose `if (isDebug) print(...)` state-transition logs are intentionally **not** routed through the callback
+* Add always-on breadcrumb log immediately before each ONNX Runtime session creation on native platforms
+  - Native: Emit `VadModel: creating OrtSession (model=... path=... bytes=... sampleRate=... intraOp=... interOp=... os=... osVersion=...)` from both `SileroV4Model.create` and `SileroV5Model.create`
+  - Diagnostics: Lands in logcat as the last line before any native crash inside `libonnxruntime.so`, so crash reports always carry the context needed to diagnose device-specific failures (especially on low-end 32-bit `armeabi-v7a` Android devices)
+  - Enrich the catch-block error message with the same context fields and stack trace
+* Documentation
+  - README: Document the new `onLog` parameter on `VadHandler.create`
+  - README: Add a "Reporting Issues" troubleshooting section with `adb logcat` capture instructions and a Crashlytics/Sentry/Bugsnag wiring example for `onLog`
+
 ## 0.0.7+1
 
 * Apply dart format to all files to meet pub.dev static analysis requirements

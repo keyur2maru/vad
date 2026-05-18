@@ -59,6 +59,9 @@ The package provides a simple API to start and stop VAD listening, configure VAD
         + [Web](#web-1)
     * [Cleaning Up](#cleaning-up)
     * [Troubleshooting](#troubleshooting)
+        + [Reporting Issues](#reporting-issues)
+            - [Capturing logcat on Android](#capturing-logcat-on-android)
+            - [Routing logs to your crash reporter (`onLog`)](#routing-logs-to-your-crash-reporter-onlog)
         + [iOS Issues](#ios-issues)
             - [TestFlight Build Error: "Failed to lookup symbol 'OrtGetApiBase'"](#testflight-build-error-failed-to-lookup-symbol-ortgetapibase)
         + [Android Issues](#android-issues)
@@ -381,7 +384,19 @@ class _MyHomePageState extends State<MyHomePage> {
 
 
 #### `create`
-Creates a new instance of the `VadHandler` with optional debugging enabled with the `isDebug` parameter. Model files are loaded from CDN by default but can be customized using the `baseAssetPath` parameter in `startListening`.
+Creates a new instance of the `VadHandler`.
+
+```dart
+static VadHandler create({
+  bool isDebug = false,
+  VadLogCallback? onLog,
+});
+```
+
+- `isDebug` — enables verbose `print` logging of internal state transitions. Useful while developing; leave off in production.
+- `onLog` — optional callback `void Function(String message)` invoked for all production (non-debug) log lines the plugin emits. This includes the model-init breadcrumb (`VadModel: creating OrtSession (...)`), session-creation errors on native and web, frame-processing and inference errors from `VadIterator`, and audio-stream / permission failures from `VadHandler`. When provided, these lines are routed through your callback instead of `print` — wire it to your crash reporter (Crashlytics, Sentry, etc.) so the breadcrumbs land in crash reports. Verbose state-transition logs gated behind `isDebug` continue to go to `print` and are **not** routed through `onLog`. See [Routing logs to your crash reporter](#routing-logs-to-your-crash-reporter-onlog).
+
+Model files are loaded from CDN by default but can be customized using the `baseAssetPath` parameter in `startListening`.
 
 #### `startListening`
 Starts the VAD with configurable parameters. Returns a `Future<void>` that completes when the VAD session has started.
@@ -536,6 +551,50 @@ vadHandler.dispose();
 ```
 
 ## Troubleshooting
+
+### Reporting Issues
+
+If the VAD package crashes or misbehaves on a specific device, please include logs with your GitHub issue. The package emits a one-line breadcrumb immediately before every ONNX Runtime session creation — it looks like:
+
+```
+VadModel: creating OrtSession (model=v5 path=... bytes=2113665 sampleRate=16000 intraOp=2 interOp=2 os=android osVersion="...")
+```
+
+When the native session creation succeeds this line is informational; when it crashes the process (e.g. a `SIGSEGV` inside `libonnxruntime.so`) this is the **last** thing logged before the crash and tells us exactly what triggered it. There are two ways to capture it:
+
+#### Capturing logcat on Android
+
+For local repros, plug in the device and run:
+
+```bash
+adb logcat -s flutter:*
+```
+
+Reproduce the crash, then copy the surrounding lines (especially anything containing `VadModel:`, `tombstone`, or `libonnxruntime.so`) into your issue. For production crashes, ask the affected user to install the debug build of your app and capture logcat the same way, or use a vendor crash reporter (see below).
+
+#### Routing logs to your crash reporter (`onLog`)
+
+`VadHandler.create` accepts an optional `onLog` callback that receives every non-debug log line the plugin emits — the model-init breadcrumb, native/web session-creation errors, frame and inference errors from `VadIterator`, and audio-stream / permission failures from `VadHandler`. Wire it to whatever telemetry your app already uses so the lines land automatically in crash reports — no per-user logcat capture needed. (Verbose `if (isDebug) print(...)` state-transition logs continue to go to `print` and are not routed through the callback.)
+
+Example with Firebase Crashlytics:
+
+```dart
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:vad/vad.dart';
+
+final vad = VadHandler.create(
+  isDebug: false,
+  onLog: (message) => FirebaseCrashlytics.instance.log(message),
+);
+```
+
+Equivalent patterns work for Sentry (`Sentry.addBreadcrumb(Breadcrumb(message: message))`), Bugsnag (`Bugsnag.leaveBreadcrumb(message)`), or any other reporter. The callback is fully optional — when omitted, breadcrumbs continue to go to `print`/logcat as before.
+
+When opening a GitHub issue, please include:
+
+- The `VadModel: creating OrtSession (...)` breadcrumb (or full logcat if you have it)
+- Device model, Android/iOS version, and ABI (`armeabi-v7a` vs `arm64-v8a` is especially important on Android)
+- The exact `vad` package version and whether the failure is on first init or after several sessions
 
 ### iOS Issues
 

@@ -2,6 +2,7 @@
 // ignore_for_file: avoid_print
 
 import 'package:vad/src/core/vad_inference.dart';
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_threading_config.dart';
 import 'package:vad/src/platform/native/inference/silero_v4_model.dart';
@@ -30,6 +31,7 @@ Future<VadInference> createVadInference({
   required bool isDebug,
   String? onnxWASMBasePath, // Unused on native
   dynamic threadingConfig,
+  VadLogCallback? onLog,
 }) async {
   if (isDebug) {
     print('VadInferenceNative: Creating $model model from $modelPath');
@@ -48,6 +50,7 @@ Future<VadInference> createVadInference({
       sampleRate,
       isDebug,
       threadingConfig: ortConfig,
+      onLog: onLog,
     );
   } else {
     vadModel = await SileroV4Model.create(
@@ -55,6 +58,7 @@ Future<VadInference> createVadInference({
       sampleRate,
       isDebug,
       threadingConfig: ortConfig,
+      onLog: onLog,
     );
   }
 

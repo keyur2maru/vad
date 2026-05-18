@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:vad/src/core/vad_event.dart';
 import 'package:vad/src/core/vad_inference.dart';
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/utils/model_utils.dart';
 
 /// Callback function type for receiving VAD events during audio processing
@@ -49,6 +50,9 @@ class VadIterator {
 
   /// VAD inference instance
   final VadInference _inference;
+
+  /// Optional callback for routing non-debug failure logs
+  final VadLogCallback? _onLog;
 
   /// Whether the user is currently speaking
   bool _speaking = false;
@@ -102,6 +106,7 @@ class VadIterator {
     required int endSpeechPadFrames,
     required int numFramesToEmit,
     required VadInference inference,
+    VadLogCallback? onLog,
   })  : _isDebug = isDebug,
         _sampleRate = sampleRate,
         _frameSamples = frameSamples,
@@ -113,7 +118,10 @@ class VadIterator {
         _endSpeechPadFrames = endSpeechPadFrames,
         _numFramesToEmit = numFramesToEmit,
         _inference = inference,
+        _onLog = onLog,
         _frameByteCount = frameSamples * 2;
+
+  void _log(String message) => (_onLog ?? print)(message);
 
   /// Reset VAD state and clear internal buffers
   void reset() {
@@ -159,7 +167,7 @@ class VadIterator {
 
   Future<void> _processFrame(Float32List data) async {
     if (data.length != _frameSamples) {
-      print(
+      _log(
           'VadIteratorImpl: Unexpected frame size: ${data.length}, expected: $_frameSamples');
       return;
     }
@@ -191,8 +199,7 @@ class VadIterator {
       _currentSample += _frameSamples;
       _handleStateTransitions(speechProb, data);
     } catch (e, stackTrace) {
-      print('VadIteratorImpl: Error in _processFrame: $e');
-      print('Stack trace: $stackTrace');
+      _log('VadIteratorImpl: Error in _processFrame: $e\n$stackTrace');
 
       // Send error event
       _onVadEvent?.call(VadEvent(
@@ -208,7 +215,7 @@ class VadIterator {
       final probs = await _inference.model.process(data);
       return probs.isSpeech;
     } catch (e) {
-      print('VadIteratorImpl: Model inference error: $e');
+      _log('VadIteratorImpl: Model inference error: $e');
       rethrow;
     }
   }
@@ -514,6 +521,7 @@ class VadIterator {
   /// [endSpeechPadFrames] - Frames to append after speech detection
   /// [numFramesToEmit] - Number of frames before emitting chunk events
   /// [threadingConfig] - Threading configuration for ONNX Runtime (Native only)
+  /// [onLog] - Optional callback for routing model-init breadcrumb logs
   static Future<VadIterator> create({
     required bool isDebug,
     required int sampleRate,
@@ -530,6 +538,7 @@ class VadIterator {
     int endSpeechPadFrames = 1,
     int numFramesToEmit = 0,
     dynamic threadingConfig,
+    VadLogCallback? onLog,
   }) async {
     // Get the model path
     final modelPath = getModelUrl(baseAssetPath, model);
@@ -542,6 +551,7 @@ class VadIterator {
       isDebug: isDebug,
       onnxWASMBasePath: onnxWASMBasePath,
       threadingConfig: threadingConfig,
+      onLog: onLog,
     );
 
     // Create and return the unified iterator implementation
@@ -557,6 +567,7 @@ class VadIterator {
       endSpeechPadFrames: endSpeechPadFrames,
       numFramesToEmit: numFramesToEmit,
       inference: inference,
+      onLog: onLog,
     );
   }
 }

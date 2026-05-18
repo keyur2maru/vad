@@ -12,23 +12,32 @@ import 'dart:typed_data';
 import 'package:vad/src/platform/web/onnxruntime/onnx_runtime_web.dart';
 import 'package:vad/src/utils/model_utils.dart';
 import 'package:vad/src/core/vad_event.dart';
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 
 class SileroV5Model implements VadModel {
   final InferenceSession _session;
   final Map<String, String> _inputNames;
   final Map<String, String> _outputNames;
+  final VadLogCallback? _onLog;
   Tensor? _state;
   Tensor? _sr;
   Future<void>? _currentProcessing;
   int _processCount = 0;
 
-  SileroV5Model._(this._session, this._inputNames, this._outputNames) {
+  SileroV5Model._(
+      this._session, this._inputNames, this._outputNames, this._onLog) {
     resetState();
   }
 
-  static Future<SileroV5Model> create(String modelUrl,
-      [String? onnxWASMBasePath]) async {
+  void _log(String message) => (_onLog ?? print)(message);
+
+  static Future<SileroV5Model> create(
+    String modelUrl, [
+    String? onnxWASMBasePath,
+    VadLogCallback? onLog,
+  ]) async {
+    final log = onLog ?? print;
     try {
       final wasmPath = onnxWASMBasePath ??
           'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
@@ -39,9 +48,9 @@ class SileroV5Model implements VadModel {
       final inputNames = getModelInputNames('v5');
       final outputNames = getModelOutputNames('v5');
 
-      return SileroV5Model._(session, inputNames, outputNames);
+      return SileroV5Model._(session, inputNames, outputNames, onLog);
     } catch (e) {
-      print('Error creating SileroV5Model: $e');
+      log('VadModel: web SileroV5 session creation failed: $e');
       rethrow;
     }
   }
@@ -100,8 +109,8 @@ class SileroV5Model implements VadModel {
         notSpeech: 1.0 - prob,
       );
     } catch (e) {
-      print('Error in SileroV5Model.process: $e');
-      print('Process count when error occurred: $_processCount');
+      _log(
+          'VadModel: web SileroV5 inference failed (processCount=$_processCount): $e');
       rethrow;
     }
   }

@@ -12,24 +12,33 @@ import 'dart:typed_data';
 import 'package:vad/src/platform/web/onnxruntime/onnx_runtime_web.dart';
 import 'package:vad/src/utils/model_utils.dart';
 import 'package:vad/src/core/vad_event.dart';
+import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 
 class SileroV4Model implements VadModel {
   final InferenceSession _session;
   final Map<String, String> _inputNames;
   final Map<String, String> _outputNames;
+  final VadLogCallback? _onLog;
   Tensor? _h;
   Tensor? _c;
   Tensor? _sr;
   Future<void>? _currentProcessing;
   int _processCount = 0;
 
-  SileroV4Model._(this._session, this._inputNames, this._outputNames) {
+  SileroV4Model._(
+      this._session, this._inputNames, this._outputNames, this._onLog) {
     resetState();
   }
 
-  static Future<SileroV4Model> create(String modelUrl,
-      [String? onnxWASMBasePath]) async {
+  void _log(String message) => (_onLog ?? print)(message);
+
+  static Future<SileroV4Model> create(
+    String modelUrl, [
+    String? onnxWASMBasePath,
+    VadLogCallback? onLog,
+  ]) async {
+    final log = onLog ?? print;
     try {
       final wasmPath = onnxWASMBasePath ??
           'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
@@ -42,9 +51,9 @@ class SileroV4Model implements VadModel {
       final inputNames = getModelInputNames('v4');
       final outputNames = getModelOutputNames('v4');
 
-      return SileroV4Model._(session, inputNames, outputNames);
+      return SileroV4Model._(session, inputNames, outputNames, onLog);
     } catch (e) {
-      print('Error creating SileroV4Model: $e');
+      log('VadModel: web SileroV4 session creation failed: $e');
       rethrow;
     }
   }
@@ -112,8 +121,8 @@ class SileroV4Model implements VadModel {
         notSpeech: 1.0 - prob,
       );
     } catch (e) {
-      print('Error in SileroV4Model.process: $e');
-      print('Process count when error occurred: $_processCount');
+      _log(
+          'VadModel: web SileroV4 inference failed (processCount=$_processCount): $e');
       rethrow;
     }
   }
