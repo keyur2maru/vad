@@ -1,3 +1,13 @@
+## 0.0.9
+
+* Fix native `SIGBUS` crash on 32-bit ARM (`armeabi-v7a`) when creating the ONNX Runtime session
+  - Native: Add `defaultGraphOptimizationLevel()`, which selects `ortDisableAll` on 32-bit platforms and keeps `ortEnableAll` everywhere else
+  - Native: Use it in `SileroV4Model.create` and `SileroV5Model.create` instead of the previously hard-coded `ortEnableAll`
+  - Cause: ONNX Runtime's `CommonSubexpressionElimination` pass hashes single-element tensor attributes by `reinterpret_cast`ing the protobuf `raw_data` pointer to `const float*` / `const int64_t*`. Those payloads start at arbitrary byte offsets, and on 32-bit ARM the VFP float load and the 64-bit `ldrd` both require natural alignment, so the process dies with `SIGBUS`/`BUS_ADRALN` inside `CreateSessionFromArray` (see microsoft/onnxruntime#26323)
+  - Scope: Affects both bundled models — `silero_vad_v5.onnx` has 263 misaligned single-element INT64 attributes, `silero_vad_legacy.onnx` has 3 misaligned FLOAT ones — so it could not be worked around by choosing a different model
+  - Diagnostics: Include `graphOpt=` in the `VadModel: creating OrtSession (...)` breadcrumb
+  - Fixes #21
+
 ## 0.0.8
 
 * Add `onLog` callback to `VadHandler.create` for routing production log lines to consumer-side telemetry (Crashlytics, Sentry, Bugsnag, etc.) without zone or `debugPrint` overrides
