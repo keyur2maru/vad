@@ -13,6 +13,7 @@ import 'package:vad/src/core/vad_event.dart';
 import 'package:vad/src/core/vad_log.dart';
 import 'package:vad/src/core/vad_model.dart';
 import 'package:vad/src/utils/model_utils.dart';
+import 'package:vad/src/platform/native/onnxruntime/graph_optimization.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_session.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_value.dart';
 import 'package:vad/src/platform/native/onnxruntime/ort_threading_config.dart';
@@ -44,17 +45,19 @@ class SileroV5Model implements VadModel {
     final log = onLog ?? print;
     final config = threadingConfig ?? OrtThreadingConfig.platformOptimal();
     final bytes = await _loadModelBytes(modelPath);
+    final graphOptimizationLevel = defaultGraphOptimizationLevel();
     final context =
         'model=v5 path=$modelPath bytes=${bytes.length} sampleRate=$sampleRate '
         'intraOp=${config.intraOpNumThreads} interOp=${config.interOpNumThreads} '
-        'os=${Platform.operatingSystem} osVersion=${Platform.operatingSystemVersion}';
+        'os=${Platform.operatingSystem} osVersion=${Platform.operatingSystemVersion} '
+        'graphOpt=${graphOptimizationLevel.name}';
     log('VadModel: creating OrtSession ($context)');
 
     try {
       final sessionOptions = OrtSessionOptions()
         ..setInterOpNumThreads(config.interOpNumThreads)
         ..setIntraOpNumThreads(config.intraOpNumThreads)
-        ..setSessionGraphOptimizationLevel(GraphOptimizationLevel.ortEnableAll);
+        ..setSessionGraphOptimizationLevel(graphOptimizationLevel);
 
       final session = OrtSession.fromBuffer(bytes, sessionOptions);
 
