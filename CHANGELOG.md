@@ -7,6 +7,9 @@
   - Scope: Affects both bundled models — `silero_vad_v5.onnx` has 263 misaligned single-element INT64 attributes, `silero_vad_legacy.onnx` has 3 misaligned FLOAT ones — so it could not be worked around by choosing a different model
   - Diagnostics: Include `graphOpt=` in the `VadModel: creating OrtSession (...)` breadcrumb
   - Fixes #21
+* Fix a native memory leak of the ONNX output tensors on every processed frame
+  - Native: `SileroV4Model.process` and `SileroV5Model.process` now release the output tensors once their values are copied; the synchronous `OrtSession.run` leaves them to the caller, and the isolate path's proxies make the release a no-op
+  - Impact: Roughly 1–2 KB per 16 ms frame, in the order of 150–250 MB per hour of continuous audio, previously never freed
 
 ## 0.0.8
 
