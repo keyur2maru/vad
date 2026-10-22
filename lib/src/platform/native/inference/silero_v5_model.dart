@@ -27,6 +27,12 @@ class SileroV5Model implements VadModel {
   var _state = List.filled(
       2, List.filled(1, Float32List.fromList(List.filled(128, 0.0))));
 
+  /// Silero v5 reads each frame together with the last 64 samples (32 at
+  /// 8 kHz) of the previous one, as the reference wrapper does.
+  late Float32List _context = Float32List(_contextSamples);
+
+  int get _contextSamples => _sampleRate == 8000 ? 32 : 64;
+
   SileroV5Model._(
     this._session,
     this._sessionOptions,
@@ -80,6 +86,7 @@ class SileroV5Model implements VadModel {
   void resetState() {
     _state = List.filled(
         2, List.filled(1, Float32List.fromList(List.filled(128, 0.0))));
+    _context = Float32List(_contextSamples);
   }
 
   @override
@@ -87,8 +94,11 @@ class SileroV5Model implements VadModel {
     final inputNames = getModelInputNames('v5');
     final outputIndices = getModelOutputIndices('v5');
 
+    final input = Float32List(_context.length + frame.length)
+      ..setAll(0, _context)
+      ..setAll(_context.length, frame);
     final inputOrt =
-        OrtValueTensor.createTensorWithDataList(frame, [_batch, frame.length]);
+        OrtValueTensor.createTensorWithDataList(input, [_batch, input.length]);
     final srOrt = OrtValueTensor.createTensorWithData(_sampleRate);
     final stateOrt = OrtValueTensor.createTensorWithDataList(_state);
     final runOptions = OrtRunOptions();
@@ -100,6 +110,7 @@ class SileroV5Model implements VadModel {
     };
 
     final outputs = _session.run(runOptions, inputs);
+    _context = input.sublist(input.length - _contextSamples);
 
     // Safe to release inputs now - isolate creates its own copies
     inputOrt.release();
