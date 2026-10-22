@@ -149,7 +149,11 @@ class SileroV4Model implements VadModel {
       ),
     );
 
-    // Don't release outputs - they're already released in the isolate
+    // The synchronous run leaves the output tensors to the caller; the
+    // isolate path returns proxies whose release is a no-op.
+    for (final output in outputs) {
+      output?.release();
+    }
 
     return SpeechProbabilities(
       isSpeech: speechProb,
