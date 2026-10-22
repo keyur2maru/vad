@@ -1,5 +1,9 @@
 ## 0.0.9
 
+* Fix Silero v5 speech probabilities on native platforms by feeding the model each frame together with the last 64 samples (32 at 8 kHz) of the previous frame, as the reference `OnnxWrapper` does
+  - Native: Keep the context between `process` calls in `SileroV5Model`, prepend it to every frame and clear it in `resetState`
+  - Cause: The v5 model expects 576 samples at 16 kHz (64 context + 512 frame); fed bare 512-sample frames it scores quiet or distant speech at 0.3–0.8 instead of 0.99 and, with the recurrent state carried across frames, drifts into near-zero scores after some tens of seconds of audio, so `realStart` stops firing
+  - Verified on a 62 s recording of real speech: the bare-frame path found 3 of 11 utterances, the context path finds all 11 and matches the reference wrapper's probabilities
 * Fix native `SIGBUS` crash on 32-bit ARM (`armeabi-v7a`) when creating the ONNX Runtime session
   - Native: Add `defaultGraphOptimizationLevel()`, which selects `ortDisableAll` on 32-bit platforms and keeps `ortEnableAll` everywhere else
   - Native: Use it in `SileroV4Model.create` and `SileroV5Model.create` instead of the previously hard-coded `ortEnableAll`
